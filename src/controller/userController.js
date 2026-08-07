@@ -27,7 +27,7 @@ class UserController {
             },
             {
                 method: 'GET',
-                path: '/',
+                path: '',
                 fn: this.getUserByName.bind(this)
             },
             {
