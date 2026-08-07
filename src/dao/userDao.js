@@ -1,19 +1,29 @@
-import db from './connector.js';
+import { getDB } from '../db/connector.js';
+import BusinessError from '../error/businessError.js';
 
-/**
- * 初始化用户表结构
- */
-try {
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS users(
-        id INTEGER PRIMARY KEY AUTOINCREMENT, 
-        username TEXT UNIQUE NOT NULL, 
-        password_hash TEXT NOT NULL, 
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )strict;
-    `);
-} catch (error) {
-    console.error(`初始化用户表失败: [${error.code}] ${error.message} \n${error.stack}`);
-    throw error;
+function registerUser(user) {
+    try {
+        const db = getDB();
+        const registerUserSql = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)');
+        return registerUserSql.run(user.username, user.password);
+    } catch (err) {
+        if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+            throw new BusinessError(100001, 'user already exists');
+        }
+        throw err;
+    }
 }
+
+function getUserByUsername(username) {
+    const db = getDB();
+    const getUserByUsernameSql = db.prepare('SELECT id,username,created_at FROM users WHERE username = ?');
+    return getUserByUsernameSql.get(username);
+}
+
+function exportUser(){
+    const db = getDB();
+    const exportUserSql = db.prepare('SELECT * FROM users');
+    return exportUserSql.all();
+}
+
+export { registerUser, getUserByUsername, exportUser };
