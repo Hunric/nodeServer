@@ -43,15 +43,23 @@ function shutdown(signal) {
     console.log(`收到 ${signal}，正在优雅退出...`);
 
     // 1. 停止接收新 HTTP 请求，等存量请求处理完
-    server.close(() => {
-        // 3. 关闭数据库
-        db.close();
-        process.exit(0);
+    const httpDone = new Promise((resolve) => {
+        server.close(resolve);
+        server.closeAllConnections(); // 关掉空闲 keep-alive 连接
     });
-    server.closeAllConnections(); // 关掉空闲 keep-alive 连接
 
     // 2. MQTT：发布离线状态 + 断开
-    disConnectMQTT();
+    const mqttDone = disConnectMQTT();
+
+    // 3. HTTP 与 MQTT 都完成后，关闭数据库并退出
+    Promise.allSettled([httpDone, mqttDone]).then(() => {
+        try {
+            db.close();
+        } catch (err) {
+            console.error(`关闭数据库失败: ${err.message}`);
+        }
+        process.exit(0);
+    });
 
     // 4. 超时兜底，防止某些连接一直不结束导致挂死
     setTimeout(() => {

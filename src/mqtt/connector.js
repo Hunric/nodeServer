@@ -154,21 +154,37 @@ function pub(data) {
 
 /**
  * 断开连接：先发布离线状态，再关闭客户端
+ * 返回 Promise，MQTT 断开完成后 resolve
  */
 function disConnectMQTT() {
-    if (mqttClient && isConnected) {
-        pub({
-            topic: '/system/availability',
-            payload: JSON.stringify({
-                online: false,     // 断开时标记为离线
-            }),
-            options: {
-                qos: 2,                // 服务质量：确保恰好一次投递
-                retain: true
-            }
-        });
-        mqttClient.end();
+    if (!mqttClient || !isConnected) {
+        return Promise.resolve();
     }
+    return new Promise((resolve) => {
+        let finished = false;
+        const done = () => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            resolve();
+        };
+        // 兜底：连接异常时 3 秒后强制断开，避免优雅退出挂死
+        const timer = setTimeout(() => {
+            try {
+                mqttClient.end(true);
+            } catch (err) {
+                log('error', err.message);
+            }
+            done();
+        }, 3000);
+
+        // 先发布离线状态，发布完成后再优雅断开（end 会等待发布完成）
+        mqttClient.publish('/system/availability', JSON.stringify({
+            online: false,     // 断开时标记为离线
+        }), { qos: 2, retain: true }, () => {
+            mqttClient.endAsync(false).then(done, done);
+        });
+    });
 }
 
 export { connectMQTT, sub, pub, disConnectMQTT };
