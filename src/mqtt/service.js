@@ -30,7 +30,7 @@ function registerMqttServer() {
             }
             return pubOk(REGISTER_RESULT_TOPIC, { error: 0, data: { userId: result.id }, message: '用户注册成功' });
         } catch (err) {
-            log('error',err.message);
+            log('error', err.message);
             pubError(REGISTER_RESULT_TOPIC, { error: 500, message: '服务器内部错误' });
         }
     })
@@ -54,4 +54,4 @@ function pubOk(topic, payload) {
     });
 }
 
-export default { registerMqttServer };
+export default registerMqttServer;
