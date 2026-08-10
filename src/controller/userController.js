@@ -1,8 +1,8 @@
 import { registerController } from './routor.js';
 import log from '../dao/logDao.js';
 import Response from '../dto/response.js';
-import crypto from 'node:crypto';
 import userService from '../service/userService.js';
+import generateMD5 from '../utils/crypto.js';
 
 function requireFields(data, fields) {
     const missing = fields.filter(f => data[f] === undefined || data[f] === null || data[f] === '');
@@ -10,10 +10,6 @@ function requireFields(data, fields) {
         return `缺少必要参数: ${missing.join(', ')}`;
     }
     return '';
-}
-
-function generateMD5(data) {
-    return crypto.createHash('md5').update(data).digest('base64');
 }
 
 class UserController {
@@ -60,7 +56,7 @@ class UserController {
 
                 const result = userService.registerUser(data);
                 if (!result.success) {
-                    return Response.err(res, result.code, '该用户已存在');
+                    return Response.err(res, result.code, result.message);
                 }
                 return Response.ok(res, { userId: result.id }, '用户注册成功');
             } catch (err) {

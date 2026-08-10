@@ -12,7 +12,7 @@ function registerUser(user) {
     } catch (err) {
         log('error', err.message);
         if (err.code === 100001) {
-            return { success: false, code: err.code };
+            return { success: false, code: err.code, message: '该用户已存在' };
         }
         throw err;
     }

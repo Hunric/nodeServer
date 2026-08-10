@@ -5,6 +5,7 @@ import http from 'node:http';
 import { matchRoute } from './src/controller/routor.js';
 import Response from './src/dto/response.js';
 import './src/controller/index.js';
+import registerMqttServer from './src/mqtt/service.js';
 
 // 初始化数据库
 const db = connectDB();
@@ -27,3 +28,6 @@ setTimeout(() => ready = true, 10_000);
 
 // 连接MQTT
 connectMQTT();
+
+// 注册 MQTT 服务
+registerMqttServer();
