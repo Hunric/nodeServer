@@ -26,5 +26,33 @@
     "password_hash": "4QrcOUm6Wau+VuBX8g+IPg==",
     "created_at": "2026-08-10 06:25:25",
     "updated_at": "2026-08-10 06:25:25"
+  },
+  {
+    "id": 5,
+    "username": "mqtttest001",
+    "password_hash": "4QrcOUm6Wau+VuBX8g+IPg==",
+    "created_at": "2026-08-10 07:06:42",
+    "updated_at": "2026-08-10 07:06:42"
+  },
+  {
+    "id": 6,
+    "username": "testMqttUser",
+    "password_hash": "4QrcOUm6Wau+VuBX8g+IPg==",
+    "created_at": "2026-08-10 07:08:37",
+    "updated_at": "2026-08-10 07:08:37"
+  },
+  {
+    "id": 7,
+    "username": "testMqttUser2",
+    "password_hash": "4QrcOUm6Wau+VuBX8g+IPg==",
+    "created_at": "2026-08-12 07:08:09",
+    "updated_at": "2026-08-12 07:08:09"
+  },
+  {
+    "id": 8,
+    "username": "test02",
+    "password_hash": "4QrcOUm6Wau+VuBX8g+IPg==",
+    "created_at": "2026-08-12 07:09:00",
+    "updated_at": "2026-08-12 07:09:00"
   }
 ]

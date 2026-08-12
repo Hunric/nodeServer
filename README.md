@@ -13,6 +13,7 @@
 | 数据库 | `better-sqlite3`（同步 API 的 SQLite） |
 | MQTT | `mqtt` v5 客户端 |
 | 配置 | `dotenv` 读取 `.env` |
+| 依赖组织 | 组合根 + 工厂函数：`compositionRoot.js` 统一装配，各模块命名导出并由组合根注入依赖 |
 
 ---
 
@@ -20,16 +21,16 @@
 
 ```
 basicServer/
-├── app.js                    # 入口：初始化 DB、启动 HTTP、连接 MQTT、注册 MQTT 服务、优雅退出
+├── app.js                    # 入口：调用 compose() 组装依赖，启动 HTTP、连接 MQTT、注册 MQTT 服务、优雅退出
+├── compositionRoot.js        # 组合根：统一创建并注入全部依赖（DB → DAO → Service → Controller / MQTT）
 ├── package.json
 ├── .env                      # 本地环境配置（不入库）
 ├── .env.example              # 配置示例
+├── config.js                 # 环境变量读取与默认值
 ├── data/                     # SQLite 数据库文件（已被 gitignore）
 ├── exports/                  # 导出文件（如 users.json，注意含密码哈希，勿提交）
 └── src/
-    ├── config/index.js       # 环境变量读取与默认值
     ├── controller/           # HTTP 路由控制器
-    │   ├── index.js          # 控制器注册入口
     │   ├── routor.js         # 手写路由匹配器
     │   ├── sysController.js  # 系统状态接口
     │   └── userController.js # 用户相关接口
@@ -37,17 +38,28 @@ basicServer/
     │   ├── userDao.js        # 用户表操作
     │   └── logDao.js         # 日志表操作
     ├── db/
-    │   ├── connector.js      # SQLite 连接（单例）
+    │   ├── connector.js      # SQLite 连接工厂（connectDB）
     │   └── schema.js         # 建表初始化
     ├── dto/response.js       # 统一 HTTP 响应格式
     ├── error/businessError.js# 业务异常类
     ├── mqtt/
-    │   ├── connector.js      # MQTT 连接管理：连接/订阅/发布/遗嘱/优雅断开
-    │   └── service.js        # MQTT 业务：注册请求处理
+    │   ├── connector.js      # MQTT 连接管理工厂：连接/订阅/发布/遗嘱/优雅断开
+    │   └── service.js        # MQTT 业务工厂：注册请求处理
     ├── service/userService.js# 用户业务逻辑
-    ├── system/getSysInfo.js  # 系统信息采集
+    ├── system/sysInfo.js     # 系统信息采集
     └── utils/crypto.js       # MD5 工具函数
 ```
+
+---
+
+## 架构说明
+
+项目采用"组合根 + 工厂函数"的方式统一组织依赖：
+
+- 所有模块一律使用**命名导出**（`export function createXxx(...)`、`export class Xxx`），不提供默认导出。
+- 依赖由各模块的工厂函数创建，统一在 `compositionRoot.js` 的 `compose()` 中装配：`createConnector().connectDB()` 得到数据库实例，依次创建 DAO、Service、Controller，最后创建 MQTT Connector/Service 并注入日志等依赖。
+- `app.js` 只调用 `compose()`，拿到 `{ db, routor, mqttConnector, mqttService }` 后启动 HTTP 与 MQTT，业务模块之间不直接互相 import。
+- 请求链路：`HTTP 请求 / MQTT 消息 → Controller / MQTT Service → Service → DAO → SQLite`，日志统一通过注入的 `logDao` 写入 `system_logs` 表。
 
 ---
 
@@ -421,7 +433,7 @@ POST http://localhost:3000/api/v1/rest/users/export
 
 服务监听了 `SIGINT`（Ctrl+C）和 `SIGTERM`，收到信号后按以下顺序清理：
 
-1. 停止接收新 HTTP 请求，等待存量请求处理完（关闭空闲 keep-alive 连接）
+1. 停止接收新 HTTP 请求：调用 `server.close()`，并 `closeAllConnections()` 关闭所有连接（含空闲 keep-alive）
 2. MQTT 发布 `{"online": false}` 并断开连接（等待离线消息发送完成）
 3. 关闭数据库
 4. 正常退出（退出码 0）
@@ -451,7 +463,7 @@ POST http://localhost:3000/api/v1/rest/users/export
 curl.exe http://localhost:3000/api/v1/rest/system/state
 
 # 注册用户
-curl.exe -X POST http://localhost:3000/api/v1/rest/users/register -H "Content-Type: application/json" -d '{"username":"test01","password":"123456"}'
+Invoke-RestMethod -Uri http://localhost:3000/api/v1/rest/users/register -Method Post -ContentType 'application/json' -Body '{"username":"test01","password":"123456"}'
 
 # 查询用户
 curl.exe "http://localhost:3000/api/v1/rest/users?username=test01"
@@ -460,7 +472,7 @@ curl.exe "http://localhost:3000/api/v1/rest/users?username=test01"
 curl.exe -X POST http://localhost:3000/api/v1/rest/users/export
 ```
 
-> PowerShell 中请使用 `curl.exe`，不要用 `curl`（它是 Invoke-WebRequest 的别名）。
+> PowerShell 中请使用 `curl.exe`，不要用 `curl`（它是 Invoke-WebRequest 的别名）。注意：Windows PowerShell 5.1 向外部程序传含双引号的参数时会剥离引号，因此带 JSON 请求体的示例使用 `Invoke-RestMethod`；在 PowerShell 7+ 中可直接用 `curl.exe -d '{"username":"test01","password":"123456"}'`。
 
 ### MQTT 测试（mosquitto）
 
@@ -476,10 +488,11 @@ mosquitto -v
 mosquitto_sub -h localhost -t "/api/v1/rest/users/register-result" -v
 ```
 
-发布注册请求：
+发布注册请求（用 `-f` 从文件读取消息，避免 PowerShell 5.1 引号被剥离）：
 
 ```powershell
-mosquitto_pub -h localhost -t "/api/v1/rest/users/register" -m '{"username":"mqttuser","password":"123456"}'
+Set-Content -Path mqtt_register.json -Value '{"username":"mqttuser","password":"123456"}' -Encoding ascii
+mosquitto_pub -h localhost -t "/api/v1/rest/users/register" -f mqtt_register.json
 ```
 
 查看在线状态：
@@ -503,3 +516,5 @@ mosquitto_sub -h localhost -t "/system/availability" -v
 - **端口与初始化延迟硬编码**：HTTP 端口固定为 3000，服务启动后需等待 10 秒才响应正常请求（期间返回"系统初始化中"）。
 - **注册结果主题是共享的**：所有 MQTT 客户端订阅同一个 `register-result` 主题，无法区分响应归属；如需区分，应在请求中携带 `requestId` 或使用按客户端隔离的响应主题。
 - **订阅为 QoS 0**：断线期间消息不补投。
+- **请求体大小无限制**：注册接口未限制请求体大小，也未监听请求流错误事件，超大请求可能占用大量内存。
+- **路由为精确匹配**：路径区分大小写且不处理尾斜杠，`/api/v1/rest/users/` 与 `/api/v1/rest/users` 是两个不同路由。

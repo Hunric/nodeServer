@@ -1,6 +1,6 @@
 import http from 'node:http';
 
-class Response {
+export class Response {
     constructor(error, data, message) {
         this.error = error;
         this.data = data;
@@ -28,6 +28,4 @@ class Response {
             message: message
         }), 'utf-8');
     }
-}
-
-export default Response;
+};

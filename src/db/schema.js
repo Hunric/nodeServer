@@ -1,7 +1,7 @@
 /**
  * 初始化数据库表结构
  */
-function initDB(db) {
+export function initDB(db) {
     if (!db) {
         throw new Error('数据库连接未初始化');
     }
@@ -31,6 +31,4 @@ function initDB(db) {
         console.error(`初始化数据库表结构失败: [${error.code}] ${error.message} \n${error.stack}`);
         throw error;
     }
-}
-
-export { initDB };
+};

@@ -1,9 +1,10 @@
-import { getDB } from '../db/connector.js';
+export function createLogDao(db) {
+    function log(level, message) {
+        const logSql = db.prepare('INSERT INTO system_logs (level, message) VALUES (?, ?)');
+        return logSql.run(level, message);
+    }
 
-function log(level, message){
-    const db = getDB();
-    const logSql = db.prepare('INSERT INTO system_logs (level, message) VALUES (?, ?)');
-    return logSql.run(level, message);
-}
-
-export default log;
+    return {
+        log
+    };
+};

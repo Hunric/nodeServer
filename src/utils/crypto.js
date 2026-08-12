@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
 
-export default function generateMD5(data) {
+export function generateMD5(data) {
     return crypto.createHash('md5').update(data).digest('base64');
-}
+};

@@ -1,8 +1,5 @@
-import { registerController } from './routor.js';
-import log from '../dao/logDao.js';
-import Response from '../dto/response.js';
-import userService from '../service/userService.js';
-import generateMD5 from '../utils/crypto.js';
+import { Response } from '../dto/response.js';
+import { generateMD5 } from '../utils/crypto.js';
 
 function requireFields(data, fields) {
     const missing = fields.filter(f => data[f] === undefined || data[f] === null || data[f] === '');
@@ -12,8 +9,10 @@ function requireFields(data, fields) {
     return '';
 }
 
-class UserController {
-    constructor() {
+export class UserController {
+    constructor(userService, logger) {
+        this.userService = userService;
+        this.logger = logger;
         this.prefix = '/api/v1/rest/users';
         this.routes = [
             {
@@ -36,7 +35,7 @@ class UserController {
     getUserByName(req, res) {
         const name = req.context['url'].searchParams.get('username');
         if (name == null) return Response.err(res, 400, '参数 username 必须');
-        const userInfo = userService.getUserByUsername(name);
+        const userInfo = this.userService.getUserByUsername(name);
         if (userInfo == null) return Response.err(res, 404, `查询的用户 ${name} 不存在`);
         Response.ok(res, userInfo, '查询成功');
     }
@@ -54,13 +53,13 @@ class UserController {
                 data['username'] = String(data['username']);
                 data['password'] = generateMD5(String(data['password']));
 
-                const result = userService.registerUser(data);
+                const result = this.userService.registerUser(data);
                 if (!result.success) {
                     return Response.err(res, result.code, result.message);
                 }
                 return Response.ok(res, { userId: result.id }, '用户注册成功');
             } catch (err) {
-                log('error', `用户注册失败: ${err.message}`);
+                this.logger.log('error', `用户注册失败: ${err.message}`);
                 if (err.name === 'SyntaxError') {
                     Response.err(res, 400, 'json 格式错误');
                 } else {
@@ -71,19 +70,13 @@ class UserController {
     }
     exportUsers(req, res) {
         try {
-            const result = userService.exportUser();
+            const result = this.userService.exportUser();
             if (!result.success) return Response.err(res, 500, '用户数据导出失败');
             Response.ok(res, { filePath: result.filePath }, '用户数据导出成功');
         } catch (err) {
-            log('error', err.message);
+            this.logger.log('error', err.message);
             Response.err(res, 500, '系统内部错误');
         }
 
     }
-}
-
-try {
-    registerController(UserController);
-} catch (err) {
-    log('error', `UserController 注册失败：${err.message}`);
 }

@@ -1,6 +1,6 @@
 import os from 'node:os';
 
-export default function getSysInfo() {
+export function getSysInfo() {
     return {
         hostname: os.hostname(),
         platform: os.platform(),
