@@ -1,3 +1,10 @@
+/**
+ * 应用入口文件
+ * - 初始化数据库与服务实例
+ * - 启动 HTTP 服务器
+ * - 连接 MQTT 并注册订阅服务
+ * - 监听 SIGINT / SIGTERM 信号，实现优雅退出
+ */
 import http from 'node:http';
 import { compose } from './compositionRoot.js';
 import { Response } from './src/dto/response.js';
@@ -8,22 +15,22 @@ const { db, routor, mqttConnector, mqttService } = compose();
 console.log('[启动] 实例组装完成');
 
 // 创建HTTP服务器
-let ready = false;
+let ready = false; // 系统初始化完成标记，未就绪前一律返回"初始化中"
 const server = http.createServer({
-    headersTimeout: 5000,
-    requestTimeout: 10000
+    headersTimeout: 5000,    // 请求头超时（毫秒）
+    requestTimeout: 10000    // 整个请求超时（毫秒）
 }, (req, res) => {
     if (ready) {
-        routor.matchRoute(req, res);
+        routor.matchRoute(req, res); // 系统就绪后按路由分发请求
     } else {
-        Response.err(res, 100002, '系统初始化中');
+        Response.err(res, 100002, '系统初始化中'); // 初始化期间拒绝业务请求
     }
 });
 server.once('listening', () => console.log('[启动] HTTP 服务器已启动，监听端口 3000'));
 server.on('error', (err) => console.error('[启动] HTTP 服务器启动失败:', err.message));
 server.listen(3000);
 setTimeout(() => {
-    ready = true;
+    ready = true; // 等待 10 秒，待数据库与 MQTT 就绪后再接收请求
     console.log('[启动] 系统初始化完成，开始接收请求');
 }, 10_000);
 
@@ -38,7 +45,7 @@ mqttService.registerMqttServer();
 console.log('[启动] MQTT 服务注册完成');
 
 // 程序退出
-let shuttingDown = false;
+let shuttingDown = false; // 是否已开始优雅退出
 function shutdown(signal) {
     if (shuttingDown) {           // 第二次收到信号（比如再按一次 Ctrl+C）强制退出
         console.log('强制退出');

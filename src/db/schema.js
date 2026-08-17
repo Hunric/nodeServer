@@ -1,5 +1,11 @@
 /**
+ * 数据库表结构定义
+ * - 负责创建应用所需的全部数据表（使用 IF NOT EXISTS，可重复执行）
+ */
+
+/**
  * 初始化数据库表结构
+ * @param {object} db better-sqlite3 数据库实例
  */
 export function initDB(db) {
     if (!db) {
@@ -7,7 +13,7 @@ export function initDB(db) {
     }
     
     try {
-        // 创建用户表
+        // 创建用户表：存储注册用户信息，username 唯一
         db.exec(`
         CREATE TABLE IF NOT EXISTS users(
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -18,7 +24,7 @@ export function initDB(db) {
         );
     `);
 
-        // 创建日志表
+        // 创建系统日志表：记录应用运行日志
         db.exec(`
         CREATE TABLE IF NOT EXISTS system_logs(
         id INTEGER PRIMARY KEY AUTOINCREMENT, 

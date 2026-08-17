@@ -1,6 +1,15 @@
+/**
+ * MQTT 连接器
+ * - 封装 mqtt 客户端的连接、订阅、发布与断开能力
+ * - 支持连接前消息缓存、主题回调分发、遗嘱消息与优雅下线
+ */
 import mqtt from 'mqtt';
 import { env } from '../../config.js';
 
+/**
+ * 创建 MQTT 连接器实例
+ * @param {object} logger 日志记录器（含 log 方法）
+ */
 export function createMqttConnector(logger) {
     // MQTT broker 的连接地址与端口
     const URL = env.MQTT_URL;
