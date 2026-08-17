@@ -43,7 +43,7 @@ basicServer/
     ├── dto/response.js       # 统一 HTTP 响应格式
     ├── error/businessError.js# 业务异常类
     ├── mqtt/
-    │   ├── connector.js      # MQTT 连接管理工厂：连接/订阅/发布/遗嘱/优雅断开
+    │   ├── connector.js      # MQTT 连接管理工厂：连接/订阅/发布/遗嘱/优雅断开，消息只转发原始 Buffer，不解析
     │   └── service.js        # MQTT 业务工厂：注册请求处理
     ├── service/userService.js# 用户业务逻辑
     ├── system/sysInfo.js     # 系统信息采集
@@ -362,6 +362,8 @@ POST http://localhost:3000/api/v1/rest/users/export
 
 ### 注册请求 / 响应示例
 
+> 设计约定：`connector` 只负责把收到的消息原样转发给业务回调（原始 `Buffer`），不做任何格式解析；payload 解析由 `service` 层按需处理，当前注册请求采用 JSON 格式。
+
 发布到 `/api/v1/rest/users/register`：
 
 ```json
@@ -386,11 +388,13 @@ POST http://localhost:3000/api/v1/rest/users/export
 错误响应示例：
 
 ```json
+{ "error": 400, "message": "请求体不是合法的 JSON 格式" }
+{ "error": 400, "message": "请求体为空" }
 { "error": 400, "message": "缺少必要参数: username, password" }
 { "error": 100001, "message": "该用户已存在" }
 ```
 
-> 说明：当前实现中，无效 JSON 的请求会返回 `error: 500`（message 为原始解析错误），后续建议调整为 400。
+> 说明：错误码语义：`400` 表示客户端问题（非法 JSON、空请求体、缺字段），`500` 表示服务器内部错误。
 
 ### 在线状态与遗嘱
 

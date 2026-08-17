@@ -50,18 +50,9 @@ export function createMqttConnector(logger) {
             subscribeAll(); // 订阅已登记的主题
         });
         mqttClient.on('message', (topic, payload) => {
-            // 收到订阅主题的消息：解析 JSON 并分发到对应回调
-            try {
-                const data = JSON.parse(payload.toString());
-                if (dispenser.has(topic)) {
-                    dispense(dispenser.get(topic), data); // 调用该 topic 的回调数组
-                }
-            } catch (err) {
-                // 记录解析或分发失败，附带主题与原始负载便于排查
-                logger.log('error', `message: ${err.message}\ntopic: ${topic}\npayload: ${payload}`);
-                if (dispenser.has(topic)) {
-                    dispense(dispenser.get(topic), err);
-                }
+            // 收到订阅主题的消息：将原始 payload（Buffer）转发给回调，解析由订阅方自行处理
+            if (dispenser.has(topic)) {
+                dispense(dispenser.get(topic), payload);
             }
         });
         mqttClient.on('error', (err) => {
@@ -120,7 +111,7 @@ export function createMqttConnector(logger) {
     /**
      * 注册订阅：把回调登记到 dispenser，并在已连接时立即订阅
      * @param {string} topic 订阅主题
-     * @param {Function} fn 收到该主题消息时的回调
+     * @param {Function} fn 收到该主题消息时的回调，参数为原始 payload（Buffer）
      */
     function sub(topic, fn) {
         if (!dispenser.has(topic)) {

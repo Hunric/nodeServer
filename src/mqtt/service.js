@@ -13,16 +13,23 @@ export function createMqttService(mqttConnector, userService, logger) {
 
     function registerMqttServer() {
         mqttConnector.sub('/api/v1/rest/users/register', (payload) => {
-            if (payload instanceof Error) return pubError(REGISTER_RESULT_TOPIC, { error: 500, message: payload.message });
-            if (payload == null) return pubError(REGISTER_RESULT_TOPIC, { error: 400, message: '请求体为空' });
-            const isMissing = requireFields(payload, ['username', 'password']);
+            // connector 只转发原始 payload（Buffer），此处按需自行解析：格式错误返回 400
+            let data;
+            try {
+                data = JSON.parse(payload.toString());
+            } catch (err) {
+                logger.log('error', `invalid json: ${err.message}\npayload: ${payload}`);
+                return pubError(REGISTER_RESULT_TOPIC, { error: 400, message: '请求体不是合法的 JSON 格式' });
+            }
+            if (data == null) return pubError(REGISTER_RESULT_TOPIC, { error: 400, message: '请求体为空' });
+            const isMissing = requireFields(data, ['username', 'password']);
             if (isMissing) return pubError(REGISTER_RESULT_TOPIC, { error: 400, message: isMissing });
 
-            payload['username'] = String(payload['username']);
-            payload['password'] = generateMD5(String(payload['password']));
+            data['username'] = String(data['username']);
+            data['password'] = generateMD5(String(data['password']));
 
             try {
-                const result = userService.registerUser(payload);
+                const result = userService.registerUser(data);
                 if (!result.success) {
                     return pubError(REGISTER_RESULT_TOPIC, { error: result.code, message: result.message });
                 }
