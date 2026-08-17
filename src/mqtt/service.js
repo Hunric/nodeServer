@@ -38,6 +38,8 @@ export function createMqttService(mqttConnector, userService, logger) {
                 logger.log('error', err.message);
                 pubError(REGISTER_RESULT_TOPIC, { error: 500, message: '服务器内部错误' });
             }
+        }, {
+            qos: 2
         })
     }
 

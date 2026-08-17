@@ -404,7 +404,9 @@ POST http://localhost:3000/api/v1/rest/users/export
 
 ### 订阅服务质量
 
-当前订阅均为默认 QoS 0，`clean: true` 意味着断线重连期间的消息不会补投。若业务需要"断线不丢消息"，需改为固定 clientId + `clean: false` + 订阅 QoS 1/2。
+- 注册请求订阅使用 QoS 2（恰好一次投递），注册结果发布同样使用 QoS 2；在线状态发布（含遗嘱）为 QoS 2 + retain。
+- 注意：MQTT 有效投递级别取发布端与订阅端的较小值，若发布端以 QoS 0 发布，实际仍按 QoS 0 处理。
+- `clean: true` 意味着断线重连期间的消息不会补投（会话不持久化）。若业务需要"断线不丢消息"，需改为固定 clientId + `clean: false` + 订阅 QoS 1/2。
 
 ---
 

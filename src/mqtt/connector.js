@@ -26,7 +26,7 @@ export function createMqttConnector(logger) {
 
     let mqttClient = null;   // MQTT 客户端实例
     let isConnected = false; // 是否已建立连接
-    const dispenser = new Map(); // topic -> 回调函数数组
+    const dispenser = new Map(); // topic -> { fn: 回调函数, options: 订阅选项 }
     const triggers = [];          // 待发布的"连接就绪后"消息队列
 
     /**
@@ -50,9 +50,13 @@ export function createMqttConnector(logger) {
             subscribeAll(); // 订阅已登记的主题
         });
         mqttClient.on('message', (topic, payload) => {
-            // 收到订阅主题的消息：将原始 payload（Buffer）转发给回调，解析由订阅方自行处理
-            if (dispenser.has(topic)) {
-                dispense(dispenser.get(topic), payload);
+            // 收到订阅主题的消息：将原始 payload（Buffer）转发给该 topic 注册的回调
+            const entry = dispenser.get(topic);
+            if (!entry) return;
+            try {
+                entry.fn(payload);
+            } catch (err) {
+                logger.log('error', err.message);
             }
         });
         mqttClient.on('error', (err) => {
@@ -82,26 +86,11 @@ export function createMqttConnector(logger) {
     }
 
     /**
-     * 遍历回调数组逐个执行，单个回调抛错不影响后续执行
-     * @param {Array} fns 回调函数数组
-     * @param {*} payload 传给回调的数据
-     */
-    function dispense(fns, payload) {
-        for (let fn of fns) {
-            try {
-                fn(payload);
-            } catch (err) {
-                logger.log('error', err.message);
-            }
-        }
-    }
-
-    /**
-     * 对 dispenser 中已登记的所有 topic 执行订阅，并打印订阅结果
+     * 对 dispenser 中已登记的所有 topic 执行订阅（按各 topic 注册时的选项），并打印订阅结果
      */
     function subscribeAll() {
-        for (let topic of dispenser.keys()) {
-            mqttClient.subscribe(topic, null, (err, granted) => {
+        for (let [topic, entry] of dispenser) {
+            mqttClient.subscribe(topic, entry.options, (err, granted) => {
                 if (err) return logger.log('error', err.message);
                 logger.log('info', JSON.stringify(granted));
             });
@@ -109,18 +98,15 @@ export function createMqttConnector(logger) {
     }
 
     /**
-     * 注册订阅：把回调登记到 dispenser，并在已连接时立即订阅
+     * 注册订阅：一个 topic 只保留一个回调，重复注册同一 topic 时覆盖旧回调
      * @param {string} topic 订阅主题
      * @param {Function} fn 收到该主题消息时的回调，参数为原始 payload（Buffer）
+     * @param {object} [options] 订阅选项，与 mqttClient.subscribe 的 options 参数一致（如 qos）
      */
-    function sub(topic, fn) {
-        if (!dispenser.has(topic)) {
-            dispenser.set(topic, [fn]);
-        } else {
-            dispenser.get(topic).push(fn);
-        }
+    function sub(topic, fn, options = {}) {
+        dispenser.set(topic, { fn, options });
         if (isConnected) {
-            mqttClient.subscribe(topic, null, (err, granted) => {
+            mqttClient.subscribe(topic, options, (err, granted) => {
                 if (err) return logger.log('error', err.message);
                 logger.log('info', JSON.stringify(granted));
             });
